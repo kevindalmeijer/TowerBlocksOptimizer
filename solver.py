@@ -1,93 +1,139 @@
 import configuration
+import city
 import copy
 
 
+class InfeasibleConfigurationError(Exception):
+    """
+    Error for configurations that cannot be constructed with valid moves.
+    """
+    def __init__(self, config, conflict):
+        super().__init__(f"Configuration\n{config}\nincludes the minimal conflict\n{conflict}.")
+
+
+class SafeReductionError(Exception):
+    """
+    Error that indicates that a reduction that was flagged as safe could not safely be performed.
+    """
+    pass
+
+
 class Solver:
-    def __init__(self, city):
+    """
+    Class to calculate high-scoring configurations and the corresponding moves to construct them.
+    """
+
+    def __init__(self, city: city.City) -> None:
         """
         Initialize the Solver object with a reference to a City.
 
         Args:
-            city (City): The City object that contains the grid, neighbor, and point information.
+            city (City): The City object that contains the grid, color, and scoring information.
         """
         self.city = city
-        self.status = dict()
+        self.info = dict()
 
-    def solve(self):
+    def solve(self) -> tuple[configuration.Configuration, dict]:
         """
-        Solve the optimization problem and return a final configuration and status.
+        Solve an optimization problem to obtain a high-scoring configuration.
 
         Returns:
-            - Configuration: An instance of Configuration with the final tower placement.
-            - dict: Status information about the solve.
-        """
-        solution = configuration.Configuration(self.city)
-        self.status["optimal"] = False
-        if not self.is_implementable(solution):
-            raise Exception("Could not prove the solution is implementable.")
-        return solution, self.status
-
-    def get_moves(self, config: configuration.Configuration):
-        """
-        Given a configuration, return a list of moves (row, col, color) to achieve that configuration,
-        or raise an error if such list can be found. There is no guarantee that this list is of minimal length.
-        TODO: Guarantee that a list can be found if it exists;
-            currently not the case for [[0, 3, 0], [3, 0, 3], [0, 3, 0]]
-
-        Args:
-            config (Configuration): The final tower configuration.
-
-        Returns:
-            list of tuples: A list of (row, col, color) tuples representing the moves.
+            Configuration: Final tower configuration resulting from the optimization.
+            dict: Dictionary with information about the solve.
 
         Raises:
-            Exception: If a path to the configuration cannot be found.
+            InfeasibleConfigurationError: If no valid moves can be found to construct
+            the generated solution configuration.
         """
-        current_config = copy.deepcopy(config)
-        moves = []
+        solution = configuration.Configuration(self.city)
+        self.info["optimal"] = False
 
-        # Work back in time to reduce the towers and record the corresponding moves
+        # TODO: improve zero solution
+
+        self.info["moves"] = self.get_moves(solution)  # raises error if impossible
+        return solution, self.info
+
+    def get_moves(self, config: configuration.Configuration) -> tuple[int, int, int]:
+        """
+        Generate a list of moves (row, col, color) that turn the zero configuration
+        into the provided configuration, or throw an error with a minimal conflict.
+        This method is exhaustive and should find a list of moves if one exists,
+        although there are no guarantees on the length of the list.
+
+        Args:
+            config (configuration.Configuration): The target configuration.
+
+        Raises:
+            InfeasibleConfigurationError: If the configuration cannot be attained.
+
+        Returns:
+            tuple: List of moves (row, col, color).
+        """
+        reduced_config, moves = self.__get_reduced_configuration(config)
+        if not self.valid_sequence(reduced_config, moves, config):
+            raise Exception("get_moves() generated an invalid sequence of moves.")  # this should never happen
+
+        if not reduced_config.all_zero():
+            raise InfeasibleConfigurationError(config, reduced_config)
+
+        return moves
+
+    def valid_sequence(
+        self,
+        start_config: configuration.Configuration,
+        moves: list[tuple[int, int, int]],
+        end_config: configuration.Configuration
+    ) -> bool:
+        """
+        Test if the sequence of moves allows the start configuration to turn into the end configuration.
+
+        Args:
+            start_config (configuration.Configuration): Start configuration.
+            moves (list[tuple[int, int, int]]): List of moves (row, col, color).
+            end_config (configuration.Configuration): End configuration.
+
+        Returns:
+            bool: True if all moves are valid and provide a path from start to end, False otherwise.
+        """
+        config = copy.deepcopy(start_config)
+        for move in moves:
+            try:
+                config.place_tower(*move, verify=True)  # apply moves with verification
+            except configuration.PlacementError:
+                return False  # invalid tower placement
+        return config.towers == end_config.towers  # test if end_config has been reached
+
+    def __apply_safe_reductions(self, config: configuration.Configuration) -> list[tuple[int, int, int]]:
+        """
+        Apply as many safe reductions to the given configuration as possible
+        (modifying the input) and return the moves that correspond to this reduction.
+
+        Args:
+            config (configuration.Configuration): The configuration to start from -- will be modified!
+
+        Returns:
+            list: List of moves to move from the modified configuration to the original configuration.
+        """
+        moves = []
         change_made = True
         while change_made:
             change_made = False
             for row in range(self.city.n):
                 for col in range(self.city.m):
-                    new_moves = self.__safe_reduce(current_config, row, col)
+                    new_moves = self.__apply_safe_reduction(config, row, col)
                     if len(new_moves) > 0:
                         change_made = True
                         moves = new_moves + moves
-
-        if not self.moves_valid(moves, config):
-            raise Exception(
-                "Could not find list of moves for the given configuration: " +
-                "Either the configuration is infeasible, or the get_moves() algorithm is not sufficiently strong."
-            )  # TODO
-
         return moves
 
-    def moves_valid(self, moves, goal):
-
-        config = configuration.Configuration(city=self.city)
-
-        for move in moves:
-            try:
-                config.place_tower(*move, verify=True)
-            except Exception:
-                return False
-
-        if config.towers != goal.towers:
-            return False
-
-        return True
-
-    def is_implementable(self, config: configuration.Configuration):
-        try:
-            self.get_moves(config)
-            return True
-        except Exception:
-            return False
-
-    def __safe_reduce(self, config: configuration.Configuration, row, col, error_on_fail=False):
+    # TODO: clean and document
+    def __apply_safe_reduction(
+        self,
+        config: configuration.Configuration,
+        row: int,
+        col: int,
+        error_on_fail: bool = False
+    ) -> list[tuple[int, int, int]]:
         """
         Attempt to safely reduce the color of a tower at a specific position to 0, if possible.
 
@@ -134,6 +180,7 @@ class Solver:
 
         moves = []       # track moves performed
         promotions = []  # track necessary promotions for the reduction
+        promotion_colors = []
 
         neighbors = self.city.neighbors(row, col)
         nb_zero = sum(config.towers[p][q] == 0 for p, q in neighbors)
@@ -180,10 +227,8 @@ class Solver:
             promoted = False
             for p, q in neighbors:
                 if safely_promotable(p, q):
-                    # perform promotion
-                    config.towers[p][q] = color_needed
-                    moves = [(p, q, 0)] + moves
                     promotions += [(p, q)]
+                    promotion_colors += [color_needed]
                     promoted = True
                     break
 
@@ -192,10 +237,86 @@ class Solver:
 
             nb_promotions_available -= 1
 
-        # reduce (row, col) to 0 and then reduce the promotions that were made
+        for promotion, promotion_color in zip(promotions, promotion_colors):
+            p, q = promotion
+            config.towers[p][q] = promotion_color
+            moves = [(p, q, 0)] + moves
         config.towers[row][col] = 0
         moves = [(row, col, color)] + moves
-        for p, q in promotions:
-            moves = self.__safe_reduce(config, p, q, error_on_fail=True) + moves
+        for promotion, promotion_color in zip(promotions, promotion_colors):
+            p, q = promotion
+            moves = self.__apply_safe_reduction(config, p, q, error_on_fail=True) + moves
 
         return moves
+
+    # TODO: clean and document
+    def __get_reduced_configuration(self, config: configuration.Configuration):
+        """
+        Given a configuration, return a list of moves (row, col, color) to achieve that configuration,
+        or raise an error if such list can be found. There is no guarantee that this list is of minimal length.
+        TODO: Guarantee that a list can be found if it exists;
+            currently not the case for [[0, 3, 0], [3, 0, 3], [0, 3, 0]]
+
+        Args:
+            config (Configuration): The final tower configuration
+
+        Returns:
+            list of tuples: A list of (row, col, color) tuples representing the moves.
+            #TODO moves + reduced
+
+        Raises:
+            Exception: If a path to the configuration cannot be found.
+            #TODO error if fails
+        """
+        
+
+        current_config = copy.deepcopy(config)
+        moves = self.__apply_safe_reductions(current_config)
+        minimal_config = current_config
+        minimal_config_moves = moves
+
+        
+        # If safe reductions are insufficient to reduce all towers,
+        # recursively call get_moves() for each 2-promotion that enables a 3-reduction
+        if not current_config.all_zero():
+            
+            def get_two_promotion_eligible_neighbors(row, col):
+                
+                color = current_config.towers[row][col]
+                if color != 3:
+                    return []
+                
+                neighbors = self.city.neighbors(row, col)
+                nb_zero = sum(current_config.towers[p][q] == 0 for p, q in neighbors)
+                nb_one = sum(current_config.towers[p][q] == 1 for p, q in neighbors)
+                
+                if not ((nb_zero >= 2 and nb_one >= 1) or nb_zero >= 3):
+                    return []
+                
+                return [(p, q) for p, q in neighbors if current_config.towers[p][q] == 0]
+            
+            possible_promotions = set()
+            for row in range(self.city.n):
+                for col in range(self.city.m):
+                    possible_promotions.update(get_two_promotion_eligible_neighbors(row, col))
+            
+            for row, col in possible_promotions:
+                trial_config = copy.deepcopy(current_config)
+                trial_config.place_tower(row, col, 2)
+                reduced_trial_config, new_moves = self.__get_reduced_configuration(trial_config)
+                trial_moves = new_moves + [(row, col, 0)] + moves
+                
+                if reduced_trial_config < minimal_config:
+                    minimal_config = reduced_trial_config
+                    minimal_config_moves = trial_moves
+                
+                if reduced_trial_config.all_zero():
+                    current_config = reduced_trial_config
+                    moves = trial_moves
+                    break
+            
+            if not current_config.all_zero():
+                current_config = minimal_config
+                moves = minimal_config_moves
+            
+        return current_config, moves

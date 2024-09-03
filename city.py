@@ -1,31 +1,38 @@
 class City:
+    """
+    Class that models the properties of a city, including grid size and allowed tower colors.
+    """
 
-    def __init__(self, n, m, points=[1, 2, 3, 4]):
+    def __init__(self, rows: int, cols: int, scores: list = [1, 2, 3, 4]) -> None:
         """
         Initialize the City object.
 
         Args:
-            n (int): Number of rows in the grid.
-            m (int): Number of columns in the grid.
+            rows (int): Number of rows in the grid.
+            cols (int): Number of columns in the grid.
+            scores (list): List of scores for each of the four tower colors.
         """
-        self.n = n
-        self.m = m
-        self.points = points
+        self.n = rows
+        self.m = cols
+        if len(scores) != 4:
+            raise Exception(f"Provided len(scores)={len(scores)} but len(scores)=4 expected.")
+        self.scores = scores
 
         self.nb_colors = 4
         self.colors = ["Blue", "Red", "Green", "Yellow"]
-        self.colors_short = [color[0:1] for color in self.colors]
+        self.colors_short = list(str(i) for i in range(4))
 
-    def neighbors(self, row, col):
+    def neighbors(self, row: int, col: int) -> list[tuple[int, int]]:
         """
-        Create a list of neighboring cells for a given cell, filtering out-of-bounds neighbors.
+        Create a list of neighbors to a given cell, filtering out-of-bounds neighbors.
 
         Args:
             row (int): The row index of the cell.
             col (int): The column index of the cell.
 
         Returns:
-            list of tuples: A list of (row, col) tuples representing valid neighboring cells.
+            list: A list of (row, col) tuples representing valid neighboring cells.
+            For the 1x1 grid the list is empty.
         """
         neighbors = [
             (row - 1, col),  # Up

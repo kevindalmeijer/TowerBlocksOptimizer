@@ -52,6 +52,7 @@ class Solver:
         # TODO: improve zero solution
 
         self.info["moves"] = self.get_moves(solution)  # raises error if impossible
+        self.info["total_score"] = solution.get_total_score()
         return solution, self.info
 
     def get_moves(self, config: configuration.Configuration) -> tuple[int, int, int]:

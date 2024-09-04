@@ -51,6 +51,20 @@ class Configuration:
         color_map = self.city.colors_short
         return "\n".join([" ".join([color_map[cell] for cell in row]) for row in self.towers])
 
+    def get_total_score(self) -> int:
+        """
+        Return the total score of the configuration by summing the scores of all towers.
+        The score per tower is provided by the city.
+
+        Returns:
+            int: Total score for this configuration.
+        """
+        return sum(
+            self.city.scores[self.towers[row][col]]
+            for row in range(self.city.n)
+            for col in range(self.city.m)
+        )
+
     def place_tower(self, row: int, col: int, color: int, verify: bool = False) -> None:
         """
         Place a tower on the grid.
@@ -90,6 +104,23 @@ class Configuration:
             if self.towers[p][q] == color:
                 return True
         return False
+
+    def neighbor_counts(self, row: int, col: int) -> list[int]:
+        """
+        Return a list of the number of neigboring towers for each color.
+
+        Args:
+            row (int): The row index of the tower.
+            col (int): The column index of the tower.
+
+        Returns:
+            list: list of the number of neigboring towers for each color, i.e.,
+                element color is the number of neighbors with that color.
+        """
+        return [
+            sum(self.towers[p][q] == color for p, q in self.city.neighbors(row, col))
+            for color in range(self.city.nb_colors)
+        ]
 
     def all_zero(self) -> bool:
         """

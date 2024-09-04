@@ -226,7 +226,7 @@ class Solver:
         moves = [(row, col, color)] + moves
 
         # Undo the promotions with recursive reductions that are guaranteed to safe by design
-        for p, q, _promotion_color in promotions:
+        for p, q, _ in promotions:
             moves = self.__apply_safe_reduction(config, p, q, error_on_fail=True) + moves  # fail on error
 
         return moves
@@ -251,7 +251,6 @@ class Solver:
             promote_row (int): The row index of the tower to be promoted.
             promote_col (int): The column index of the tower to be promoted.
             promote_color (int): The color of the tower to be promoted.
-            free_neighbors (list): Free neighbors that can be used to undo the promotion.
 
         Returns:
             bool: True if (row, col) is safely promotable, False otherwise.
@@ -276,74 +275,90 @@ class Solver:
                     continue
                 if config.towers[v][w] in [0, 1]:
                     return True
-
         return False
 
-    # TODO: clean and document
-    def __get_reduced_configuration(self, config: configuration.Configuration):
+    def __get_reduced_configuration(
+        self,
+        config: configuration.Configuration
+    ) -> tuple[configuration.Configuration, list[tuple[int, int, int]]]:
         """
-        Given a configuration, return a list of moves (row, col, color) to achieve that configuration,
-        or raise an error if such list can be found. There is no guarantee that this list is of minimal length.
-        TODO: Guarantee that a list can be found if it exists;
-            currently not the case for [[0, 3, 0], [3, 0, 3], [0, 3, 0]]
+        Generates a reduced configuration and a list of moves (row, col, color) such that:
+        - applying the list of moves to the reduced configuration results in the original configuration,
+        - the reduced configuration cannot be reduced further.
+
+        The reduction is performed by first applying safe reductions (see __apply_safe_reductions()) and
+        then performing depth-first search on potentially unsafe reductions.
+        The original config is not modified during this process.
 
         Args:
-            config (Configuration): The final tower configuration
+            config (configuration.Configuration): The configuration to be reduced -- will not be modified.
 
         Returns:
-            list of tuples: A list of (row, col, color) tuples representing the moves.
-            #TODO moves + reduced
-
-        Raises:
-            Exception: If a path to the configuration cannot be found.
-            #TODO error if fails
+            configuration.Configuration: The reduced configuration, which is either all zeros if config
+                can be constructed with valid moves, or represent a minimal (but not necessarily minimum) conflict.
         """
-        current_config = copy.deepcopy(config)
-        moves = self.__apply_safe_reductions(current_config)
-        minimal_config = current_config
-        minimal_config_moves = moves
+        current_config = copy.deepcopy(config)  # config at current node of the search tree
+        current_moves = []                      # ...and corresponding moves from current_config to config
 
-        # If safe reductions are insufficient to reduce all towers,
-        # recursively call get_moves() for each 2-promotion that enables a 3-reduction
-        if not current_config.all_zero():
+        current_moves = self.__apply_safe_reductions(current_config) + current_moves
+        if current_config.all_zero():
+            return current_config, current_moves  # safe reductions were sufficient to obtain the all-zero configuration
 
-            def get_two_promotion_eligible_neighbors(row, col):
+        minimal_config = current_config         # minimal config encountered during the search
+        minimal_moves = current_moves           # ...and corresponding moves from minimal_config to config
 
-                color = current_config.towers[row][col]
-                if color != 3:
-                    return []
+        search_list = self.__get_useful_two_promotions(current_config)
+        for promotion in search_list:
 
-                neighbors = self.city.neighbors(row, col)
-                nb_zero = sum(current_config.towers[p][q] == 0 for p, q in neighbors)
-                nb_one = sum(current_config.towers[p][q] == 1 for p, q in neighbors)
+            next_config = copy.deepcopy(current_config)     # create new node in the search tree
+            next_config.place_tower(*promotion, 2)          # apply promotion to the node
+            next_to_current_move = [(*promotion, 0)]        # record move to undo the promotion
 
-                if not ((nb_zero >= 2 and nb_one >= 1) or nb_zero >= 3):
-                    return []
+            # create a reduced next configuration and corresponding moves through a recursive call
+            reduced_next_config, reduced_next_to_next_moves = self.__get_reduced_configuration(next_config)
+            reduced_next_moves = reduced_next_to_next_moves + next_to_current_move + current_moves
 
-                return [(p, q) for p, q in neighbors if current_config.towers[p][q] == 0]
+            if reduced_next_config.all_zero():
+                return reduced_next_config, reduced_next_moves
 
-            possible_promotions = set()
-            for row in range(self.city.n):
-                for col in range(self.city.m):
-                    possible_promotions.update(get_two_promotion_eligible_neighbors(row, col))
+            if reduced_next_config < minimal_config:
+                minimal_config = reduced_next_config
+                minimal_moves = reduced_next_moves
 
-            for row, col in possible_promotions:
-                trial_config = copy.deepcopy(current_config)
-                trial_config.place_tower(row, col, 2)
-                reduced_trial_config, new_moves = self.__get_reduced_configuration(trial_config)
-                trial_moves = new_moves + [(row, col, 0)] + moves
+        return minimal_config, minimal_moves
 
-                if reduced_trial_config < minimal_config:
-                    minimal_config = reduced_trial_config
-                    minimal_config_moves = trial_moves
+    def __get_useful_two_promotions(self, config: configuration.Configuration) -> set[tuple[int, int]]:
+        """
+        Return the set of all useful 2-promotions (row, col). A 2-promotion is said to be useful if
+        promoting (row, col) from 0 to 2 enables the safe reduction of a neighboring tower of color 3,
+        where this was previously impossible.
 
-                if reduced_trial_config.all_zero():
-                    current_config = reduced_trial_config
-                    moves = trial_moves
-                    break
+        Args:
+            config (configuration.Configuration): The tower configuration.
 
-            if not current_config.all_zero():
-                current_config = minimal_config
-                moves = minimal_config_moves
+        Returns:
+            set: Set of useful 2-promotions (row, col).
+        """
 
-        return current_config, moves
+        # Loop over 3-towers for which safe reduction is enabled by promoting a neighboring 0 to 2.
+        # For these 3-towers, flag all the 0 neighbors as useful promotions.
+
+        useful_two_promotions = set()  # avoid duplicates when promotions are useful to multiple neighbors
+
+        for row in range(self.city.n):
+            for col in range(self.city.m):
+                if config.towers[row][col] != 3:
+                    continue  # only interested in 3-towers
+                counts = config.neighbor_counts(row, col)
+                if counts[2] > 0:
+                    continue  # 2-tower is already available
+                if counts[0] < 2:
+                    continue  # need at least two 0-neighbors; one for the reduction and one to promote to 2
+                if counts[1] >= 1 or counts[0] >= 3:
+                    # need at least one 1-tower (0/0/1) or three 0-towers (0/0/0)
+                    useful_two_promotions.update(
+                        (p, q) for p, q in self.city.neighbors(row, col)
+                        if config.towers[p][q] == 0  # flag 0-neighbors
+                    )
+
+        return useful_two_promotions

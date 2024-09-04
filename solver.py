@@ -15,7 +15,8 @@ class SafeReductionError(Exception):
     """
     Error that indicates that a reduction that was flagged as safe could not safely be performed.
     """
-    pass
+    def __init__(self, config, row, col):
+        super().__init__(f"Failed to safely reduce ({row}, {col}) in configuration\n{config}.")
 
 
 class Solver:
@@ -126,7 +127,6 @@ class Solver:
                         moves = new_moves + moves
         return moves
 
-    # TODO: clean and document
     def __apply_safe_reduction(
         self,
         config: configuration.Configuration,
@@ -135,119 +135,148 @@ class Solver:
         error_on_fail: bool = False
     ) -> list[tuple[int, int, int]]:
         """
-        Attempt to safely reduce the color of a tower at a specific position to 0, if possible.
+        Attempt to safely reduce the color of the tower at position (row, col) to zero.
+        If the reduction is successful, config is updated to the reduced configuration and a
+        list of corresponding moves from the reduced configuration to the original configuration is returned.
+        If no safe reduction is possible, either an empty list of moves is returned (default),
+        or an error is thrown (if error_on_fail is set).
 
-        This method tries to "reduce" the color of a tower (change its color to 0)
-        at the specified (row, col) position. If the reduction is not possible, the method may either
-        return an empty list or raise an exception, depending on the `error_on_fail` flag.
+        A reduction is safe if:
+        1. Tower (row, col) neighbors all towers that would be needed to build this tower now.
+            - Example: (row, col) has color 2 and has neighbors of 0 and 1. In this case, we can
+            reduce (row, col) to color 0 and return a single valid move (row, col, 2).
+        2. Towers of color 0 neighboring (row, col) can be promoted to colors such that rule 1 applies.
+        In this case it is critical that the promotions can be undone after the reduction of (row, col).
+            - Example (1-promotion): (row, col) has color 2 and has two neighbors of 0 and no neighbors of 1.
+            Going back in time, one of the 0s (p, q) can be promoted to a 1. This corresponds to a forward
+            move (p, q, 0). Going further back in time, (row, col) can now be reduced with move (row, col, 2).
+            Finally, the promotion has to be undone. This is always possible (i.e., the reduction is safe),
+            as (row, col) serves as the necessary 0 neighbor for (p, q). Following rule 1, (p, q) is
+            reduced to 0 with move (p, q, 1). The overall result is that config now has a 0 tower at (row, col)
+            and the corresponding moves [(p, q, 1), (row, col, 2), (p, q, 0)]] are returned.
+            - Example (2-promotion): to guarantee safety, promotions to color 2 at cell (p, q) are only
+            performed if (p, q) has a neighbor (v, w) != (row, col) with color 0 or 1. For example,
+            lets say (row, col) has color 3 and has two neighbors of 0, one neighbor of 1, and no neighbors of 2.
+            One of the 0-neighbors has its own neighbor (v, w) different from (row, col) with color 1.
+            Going back in time, we can now safely promote (p, w) to 2, then reduce (row, col) to 0,
+            and then use rule 1 to reduce (p, w) to 0 based on its necessary neighbors with color 0 (row, col)
+            and color 1 (v, w).
+            - Example (nested promotion): in the example above, if (v, w) had been color 0 instead, then
+            (p, q) could still be reduced back from color 2 to color 0 by applying rule 2 (1-promotion) on
+            the two 0-neighbors (row, col) and (v, w).
 
         Args:
-            config (Configuration): The current tower configuration -- will be modified!
-            row (int): The row index of the tower to reduce.
-            col (int): The column index of the tower to reduce.
-            error_on_fail (bool): If True, raises an Exception when reduction fails.
-                                If False, returns an empty list on failure.
+            config (configuration.Configuration): The configuration to start from -- will be modified!
+            row (int): The row index of the tower to be reduced.
+            col (int): The column index of the tower to be reduced.
+            error_on_fail (bool, optional): If True, throw an error when the reduction fails.
+                The default behavior (error_on_fail=False) is to return an empty list of moves.
 
         Returns:
-            list of tuples: A list of (row, col, color) tuples representing the moves required to achieve the reduction.
-                            If reduction is not possible and `error_on_fail` is False, returns an empty list.
+            list: List of moves (p, q, color) from the reduced configuration to the original configuration.
 
         Raises:
-            Exception: If reduction is not possible and `error_on_fail` is True, an Exception is raised.
-
-        Notes:
-            - The method tries to promote adjacent towers with color 0 to the necessary color to enable the reduction.
-            - If promotion is not possible, the reduction fails.
-            - The algorithm recursively reduces any promoted towers after the initial reduction.
-            - Promotion is only carried out if this recursive reduction is guaranteed to work
+            SafeReductionError: If reduction is not possible and error_on_fail is True.
         """
-        def irreducible():
+        def reduction_fail():
             if error_on_fail:
-                raise Exception("reduce() failed while error_on_fail=True")
+                raise SafeReductionError(config, row, col)
             return []
 
         color = config.towers[row][col]
-        assert color <= 3, "This function does not support reduction for colors > 3"
-
         if color == 0:
-            return irreducible()  # no further reduction possible
-
+            return reduction_fail()  # tower is already color 0
         if not config.has_neighbor(row, col, 0):
-            return irreducible()  # no neighbors with color 0 so the reduction fails
+            return reduction_fail()  # no neighbors with color 0
 
-        # Try to find the colors needed from neighbors to make the reduction possible.
-        # If necessary, towers with color 0 are promoted to the necessary color.
+        nb_zero_neighbors = sum(config.towers[p][q] == 0 for p, q in self.city.neighbors(row, col))
+        nb_promotions_available = nb_zero_neighbors - 1  # -1 to maintain at least one neighbor with color 0
 
-        moves = []       # track moves performed
-        promotions = []  # track necessary promotions for the reduction
-        promotion_colors = []
-
-        neighbors = self.city.neighbors(row, col)
-        nb_zero = sum(config.towers[p][q] == 0 for p, q in neighbors)
-        nb_promotions_available = nb_zero - 1  # -1 to keep one 0 tower for reduction
-
-        for color_needed in reversed(range(1, color)):  # reverse loop to handle difficult promotions first
-
+        # The reduction additionally requires neighbors with colors in range [1, color).
+        # For each needed color, check if it is available or propose a promotion.
+        promotions = []
+        used_neighbors = []
+        for color_needed in reversed(range(1, color)):  # reverse loop to handle more restrictive promotions first
             if config.has_neighbor(row, col, color_needed):
-                continue  # neigbor with color_needed is readily available
-
-            # attempt to make the reduction possible by promoting a 0 to color_needed
+                continue  # no promotion necessary
             if nb_promotions_available == 0:
-                return irreducible()
-
-            # tower number can safely be increased, as it can be decreased again immediately after
-            def safely_promotable(p, q):
-
-                assert color_needed in [1, 2]  # 0 does not need promotion, color > 3 (color_needed > 2) not supported
-
-                if config.towers[p][q] != 0:
-                    return False  # only 0 towers can be promoted
-
-                if (p, q) in promotions:
-                    return False  # already used
-
-                if color_needed == 1:
-                    # after reducing (row, col) to 0, the 0 tower can be used to reduce (p, q) from 1 back to 0
-                    return True
-
-                # color_needed == 2
-                # if (p, q) has another neighbor (v, w) that is 0 or 1, then after reducing (row, col) to 0:
-                # (row, col, 0) and (v, w, 0/1) can together reduce (p, q, 2) back to 0
-                neighbor_neighbors = [
-                    neighbor_neighbor
-                    for neighbor_neighbor in self.city.neighbors(p, q)
-                    if neighbor_neighbor != (row, col)
-                ]
-                for v, w in neighbor_neighbors:
-                    if config.towers[v][w] in [0, 1]:
-                        return True
-
-                return False
-
-            promoted = False
-            for p, q in neighbors:
-                if safely_promotable(p, q):
-                    promotions += [(p, q)]
-                    promotion_colors += [color_needed]
-                    promoted = True
+                return reduction_fail()  # no more 0-towers available for promotion
+            promotion_added = False
+            for p, q in self.city.neighbors(row, col):
+                if (p, q) in used_neighbors:
+                    continue  # already used
+                if self.__safely_promotable(config, row, col, p, q, color_needed):
+                    promotions += [(p, q, color_needed)]
+                    used_neighbors += [(p, q)]
+                    promotion_added = True
                     break
-
-            if not promoted:
-                return irreducible()  # necessary promotion failed
-
+            if not promotion_added:
+                return reduction_fail()  # failed to find a safely promotable neighbor
             nb_promotions_available -= 1
 
-        for promotion, promotion_color in zip(promotions, promotion_colors):
-            p, q = promotion
+        # Perform pending promotions
+        moves = []
+        for p, q, promotion_color in promotions:
             config.towers[p][q] = promotion_color
             moves = [(p, q, 0)] + moves
+
+        # Reduce target tower
         config.towers[row][col] = 0
         moves = [(row, col, color)] + moves
-        for promotion, promotion_color in zip(promotions, promotion_colors):
-            p, q = promotion
-            moves = self.__apply_safe_reduction(config, p, q, error_on_fail=True) + moves
+
+        # Undo the promotions with recursive reductions that are guaranteed to safe by design
+        for p, q, _promotion_color in promotions:
+            moves = self.__apply_safe_reduction(config, p, q, error_on_fail=True) + moves  # fail on error
 
         return moves
+
+    def __safely_promotable(
+        self,
+        config: configuration.Configuration,
+        reduce_row: int,
+        reduce_col: int,
+        promote_row: int,
+        promote_col: int,
+        promote_color: int,
+    ) -> bool:
+        """
+        Test whether neighbor (promote_row, promote_col) in config can safely be promoted to promote_color,
+        for the sake of reducing (reduce_row, reduce_col).
+
+        Args:
+            config (configuration.Configuration): The current configuration.
+            reduce_row (int): The row index of the tower to be reduced.
+            reduce_col (int): The column index of the tower to be reduced.
+            promote_row (int): The row index of the tower to be promoted.
+            promote_col (int): The column index of the tower to be promoted.
+            promote_color (int): The color of the tower to be promoted.
+            free_neighbors (list): Free neighbors that can be used to undo the promotion.
+
+        Returns:
+            bool: True if (row, col) is safely promotable, False otherwise.
+        """
+
+        if (promote_row, promote_col) not in self.city.neighbors(reduce_row, reduce_col):
+            raise Exception(
+                f"Promotion tower ({promote_row}, {promote_col}) is not a neighbor of " +
+                f"reduction tower ({reduce_row}, {reduce_col})."
+            )
+        if promote_color not in [1, 2]:
+            raise Exception("Only promotion colors 1 and 2 are supported by safely_promotable().")
+
+        if config.towers[promote_row][promote_col] != 0:
+            return False  # only 0 towers can be promoted
+        if promote_color == 1:
+            return True  # 1-promotion is always safe: see __apply_safe_reduction()
+        elif promote_color == 2:
+            # 2-promotion requires an extra 0/1 neighbor: see __apply_safe_reduction()
+            for v, w in self.city.neighbors(promote_row, promote_col):
+                if (v, w) == (reduce_row, reduce_col):
+                    continue
+                if config.towers[v][w] in [0, 1]:
+                    return True
+
+        return False
 
     # TODO: clean and document
     def __get_reduced_configuration(self, config: configuration.Configuration):
@@ -268,55 +297,52 @@ class Solver:
             Exception: If a path to the configuration cannot be found.
             #TODO error if fails
         """
-        
-
         current_config = copy.deepcopy(config)
         moves = self.__apply_safe_reductions(current_config)
         minimal_config = current_config
         minimal_config_moves = moves
 
-        
         # If safe reductions are insufficient to reduce all towers,
         # recursively call get_moves() for each 2-promotion that enables a 3-reduction
         if not current_config.all_zero():
-            
+
             def get_two_promotion_eligible_neighbors(row, col):
-                
+
                 color = current_config.towers[row][col]
                 if color != 3:
                     return []
-                
+
                 neighbors = self.city.neighbors(row, col)
                 nb_zero = sum(current_config.towers[p][q] == 0 for p, q in neighbors)
                 nb_one = sum(current_config.towers[p][q] == 1 for p, q in neighbors)
-                
+
                 if not ((nb_zero >= 2 and nb_one >= 1) or nb_zero >= 3):
                     return []
-                
+
                 return [(p, q) for p, q in neighbors if current_config.towers[p][q] == 0]
-            
+
             possible_promotions = set()
             for row in range(self.city.n):
                 for col in range(self.city.m):
                     possible_promotions.update(get_two_promotion_eligible_neighbors(row, col))
-            
+
             for row, col in possible_promotions:
                 trial_config = copy.deepcopy(current_config)
                 trial_config.place_tower(row, col, 2)
                 reduced_trial_config, new_moves = self.__get_reduced_configuration(trial_config)
                 trial_moves = new_moves + [(row, col, 0)] + moves
-                
+
                 if reduced_trial_config < minimal_config:
                     minimal_config = reduced_trial_config
                     minimal_config_moves = trial_moves
-                
+
                 if reduced_trial_config.all_zero():
                     current_config = reduced_trial_config
                     moves = trial_moves
                     break
-            
+
             if not current_config.all_zero():
                 current_config = minimal_config
                 moves = minimal_config_moves
-            
+
         return current_config, moves

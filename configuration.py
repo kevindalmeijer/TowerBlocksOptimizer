@@ -5,7 +5,7 @@ class PlacementError(Exception):
     """
     Error for invalid tower placements.
     """
-    def __init__(self, config, row, col, color):
+    def __init__(self, config: 'Configuration', row: int, col: int, color: int):
         super().__init__(f"Placement (row={row}, col={col}, color={color}) is invalid for configuration:\n{config}")
 
 

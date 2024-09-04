@@ -1,6 +1,8 @@
 import configuration
 import city
 import copy
+import warnings
+import trivial_optimizer
 
 
 class InfeasibleConfigurationError(Exception):
@@ -34,7 +36,7 @@ class Solver:
         self.city = city
         self.info = dict()
 
-    def solve(self) -> tuple[configuration.Configuration, dict]:
+    def solve(self, optimizer=None) -> tuple[configuration.Configuration, dict]:
         """
         Solve an optimization problem to obtain a high-scoring configuration.
 
@@ -46,11 +48,12 @@ class Solver:
             InfeasibleConfigurationError: If no valid moves can be found to construct
             the generated solution configuration.
         """
-        solution = configuration.Configuration(self.city)
-        self.info["optimal"] = False
+        if optimizer is None:
+            warnings.warn("No optimizer provided: using trivial optimizer by default.", UserWarning)
+            optimizer = trivial_optimizer.TrivialOptimizer(self.city)
 
-        # TODO: improve zero solution
-
+        solution, info = optimizer.run()
+        self.info.update(info)
         self.info["moves"] = self.get_moves(solution)  # raises error if impossible
         self.info["total_score"] = solution.get_total_score()
         return solution, self.info

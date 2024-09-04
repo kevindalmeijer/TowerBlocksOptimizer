@@ -1,27 +1,10 @@
 import city
-import configuration
 import solver
+import pprint
 
-my_city = city.City(5, 5)
-
-config = configuration.Configuration(my_city)
-config.towers = [
-    [2, 3, 2, 3, 0],
-    [3, 1, 3, 2, 3],
-    [2, 3, 3, 3, 1],
-    [3, 2, 3, 1, 3],
-    [1, 3, 1, 3, 2]
-]
-
+my_city = city.City(5, 5, scores=[205, 966, 2677, 5738])
 my_solver = solver.Solver(my_city)
-moves = my_solver.get_moves(config)
 
-config = configuration.Configuration(my_city)
-print(config)
-for move in moves:
-    config.place_tower(*move)
-    print()
-    print(config)
-
-print()
-print(f"number of moves: {len(moves)}")
+solution, info = my_solver.solve()
+print(solution)
+pprint.pprint(info)

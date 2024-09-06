@@ -100,6 +100,7 @@ class CPOptimizer:
         self.x, self.y = self.__define_variables(self.model, n, m, nb_colors, nb_periods)
         self.__add_objective()
         self.__add_constraints(self.model, self.x, n, m, nb_colors, nb_periods)
+        self.__add_redundant_constraints(self.model, self.x, self.y, n, m, nb_colors, nb_periods)
 
     def __set_solver_settings(self) -> None:
         """
@@ -204,7 +205,6 @@ class CPOptimizer:
         Args:
             model (cp_model.CpModel): CP-SAT model.
             x (dict): shorthand for self.x
-            y (dict): shorthand for self.y
             n (int): shorthand for self.city.n
             m (int): shorthand for self.city.m
             nb_colors (int): shorthand for self.city.nb_colors
@@ -280,3 +280,42 @@ class CPOptimizer:
                                 for p, q in subset
                             ) - subset_size
                         )
+
+    def __add_redundant_constraints(
+        self,
+        model: cp_model.CpModel,
+        x: dict,
+        y: dict,
+        n: int,
+        m: int,
+        nb_colors: int,
+        nb_periods: int
+    ) -> None:
+        """
+        Add redundant constraints to speed up the solver.
+
+        Args:
+            model (cp_model.CpModel): CP-SAT model.
+            x (dict): shorthand for self.x
+            y (dict): shorthand for self.y
+            n (int): shorthand for self.city.n
+            m (int): shorthand for self.city.m
+            nb_colors (int): shorthand for self.city.nb_colors
+            nb_periods (int): shorthand for self.nb_periods
+        """
+
+        # If towers of color k score less than 0-towers, then 0-towers are preferred
+        for k in range(1, nb_colors):
+            if self.city.scores[k] <= self.city.scores[0]:
+                for i in range(n):
+                    for j in range(m):
+                        for t in range(nb_periods):
+                            model.add(x[i, j, k, t] == 0)
+
+        # Remove colors that have an insufficient number of neighbors to ever be reduced
+        for i in range(n):
+            for j in range(m):
+                for k in range(nb_colors):
+                    if k > len(self.city.neighbors(i, j)):
+                        for t in range(nb_periods):
+                            model.Add(x[i, j, k, t] == 0)

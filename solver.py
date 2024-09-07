@@ -40,6 +40,10 @@ class Solver:
         """
         Solve an optimization problem to obtain a high-scoring configuration.
 
+        Args:
+            optimizer: instance of an optimization class that has a function run()
+                that returns a solution and info about the solve; see TrivialOptimizer as an example.
+
         Returns:
             Configuration: Final tower configuration resulting from the optimization.
             dict: Dictionary with information about the solve.

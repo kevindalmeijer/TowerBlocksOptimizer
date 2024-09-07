@@ -310,7 +310,7 @@ class CPOptimizer:
                 for i in range(n):
                     for j in range(m):
                         for t in range(nb_periods):
-                            model.add(x[i, j, k, t] == 0)
+                            model.Add(x[i, j, k, t] == 0)
 
         # Remove colors that have an insufficient number of neighbors to ever be reduced
         for i in range(n):
@@ -319,3 +319,33 @@ class CPOptimizer:
                     if k > len(self.city.neighbors(i, j)):
                         for t in range(nb_periods):
                             model.Add(x[i, j, k, t] == 0)
+
+        # Forbid two neighbors with three neighbors each to both take on color 3
+        if nb_colors >= 4:
+            three_neighbor_pairs = set()
+            for i in range(n):
+                for j in range(m):
+                    neighbors = self.city.neighbors(i, j)
+                    if len(neighbors) == 3:
+                        for p, q in neighbors:
+                            if len(self.city.neighbors(p, q)) == 3:
+                                pair = tuple(sorted([(i, j), (p, q)]))
+                                three_neighbor_pairs.add(pair)
+            for t in range(nb_periods):
+                for neighbor1, neighbor2 in three_neighbor_pairs:
+                    i, j = neighbor1
+                    p, q = neighbor2
+                    model.Add(x[i, j, 3, t] + x[p, q, 3, t] <= 1)
+
+        # Forbid 2x2 squares of 3-towers
+        if nb_colors >= 4:
+            for t in range(nb_periods):
+                for i in range(1, n-2):
+                    for j in range(1, m-2):
+                        model.Add(
+                            sum(
+                                x[i + delta_i, j + delta_j, 3, t]
+                                for delta_i in [0, 1]
+                                for delta_j in [0, 1]
+                            ) <= 3
+                        )

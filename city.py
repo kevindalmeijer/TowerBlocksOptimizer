@@ -21,6 +21,7 @@ class City:
         self.nb_colors = 4
         self.colors = ["Blue", "Red", "Green", "Yellow"]
         self.colors_short = list(str(i) for i in range(4))
+        self.color_codes = ['#0075B5', 'red', 'green', 'yellow']
 
     def neighbors(self, row: int, col: int) -> list[tuple[int, int]]:
         """

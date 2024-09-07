@@ -1,6 +1,7 @@
 import city
 import solver
 import cp_optimizer
+import visualizer
 import pprint
 
 my_city = city.City(5, 5, scores=[205, 966, 2677, 5738])
@@ -18,3 +19,7 @@ print(
     f"obtained in {len(info['moves'])} moves:"
 )
 print(solution)
+
+viz = visualizer.Visualizer(my_city)
+viz.set_animation(info["moves"])
+viz.show()

@@ -22,4 +22,5 @@ print(solution)
 
 viz = visualizer.Visualizer(my_city)
 viz.set_animation(info["moves"])
+viz.save_animation(f"{my_city.n}x{my_city.m}_animated.gif")
 viz.show()

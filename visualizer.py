@@ -91,6 +91,19 @@ class Visualizer:
             repeat=True
         )
 
+    def save_animation(self, filename: str, fps: int = 5) -> None:
+        """
+        Save the animation as a GIF.
+
+        Args:
+            filename (str): The filename to save the GIF (with '.gif' extension).
+            fps (int): Frames per second for the animation.
+        """
+        if hasattr(self, 'animation'):
+            self.animation.save(filename, writer='pillow', fps=fps)
+        else:
+            print("No animation to save. Please run `set_animation` first.")
+
     def __reset_configuration(self) -> None:
         """
         Reset to an empty plot (all white)

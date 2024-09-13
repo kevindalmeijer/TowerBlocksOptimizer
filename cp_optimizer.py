@@ -265,21 +265,22 @@ class CPOptimizer:
 
         # Correction to forbid neighbors 0/1/1 to reduce 3-towers,
         # which is not captured by the threshold rule above.
-        for i in range(n):
-            for j in range(m):
-                neighbors = self.city.neighbors(i, j)
-                if len(neighbors) < 3:
-                    continue
-                subset_size = len(neighbors) - 1
-                for s, t in zip(range(nb_periods), range(1, nb_periods)):
-                    for subset in it.combinations(neighbors, subset_size):
-                        model.Add(
-                            x[i, j, 3, s] >= x[i, j, 3, t] + sum(
-                                x[p, q, k, t]
-                                for k in [1, 3]
-                                for p, q in subset
-                            ) - subset_size
-                        )
+        if nb_colors >= 4:
+            for i in range(n):
+                for j in range(m):
+                    neighbors = self.city.neighbors(i, j)
+                    if len(neighbors) < 3:
+                        continue
+                    subset_size = len(neighbors) - 1
+                    for s, t in zip(range(nb_periods), range(1, nb_periods)):
+                        for subset in it.combinations(neighbors, subset_size):
+                            model.Add(
+                                x[i, j, 3, s] >= x[i, j, 3, t] + sum(
+                                    x[p, q, k, t]
+                                    for k in [1, 3]
+                                    for p, q in subset
+                                ) - subset_size
+                            )
 
     def __add_redundant_constraints(
         self,

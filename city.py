@@ -3,25 +3,32 @@ class City:
     Class that models the properties of a city, including grid size and allowed tower colors.
     """
 
-    def __init__(self, rows: int, cols: int, scores: list = [1, 2, 3, 4]) -> None:
+    def __init__(self, rows: int, cols: int, nb_colors: int = 4, scores: list = [1, 2, 3, 4]) -> None:
         """
         Initialize the City object.
 
         Args:
             rows (int): Number of rows in the grid.
             cols (int): Number of columns in the grid.
+            nb_colors (int): Number of different tower colors [0, nb_colors).
             scores (list): List of scores for each of the four tower colors.
+
+        Raises:
+            ValueError: If nb_colors is invalid or not enough scores are provided.
         """
+        if nb_colors < 1 or nb_colors > 4:
+            raise ValueError(f"Number of colors {nb_colors} is out of bounds. Must be between 1 and 4.")
+        if len(scores) < nb_colors:
+            raise ValueError(f"Number of scores {len(scores)} is out of bounds. Must be at least nbcolors={nb_colors}.")
+
         self.n = rows
         self.m = cols
-        if len(scores) != 4:
-            raise Exception(f"Provided len(scores)={len(scores)} but len(scores)=4 expected.")
-        self.scores = scores
+        self.nb_colors = nb_colors
 
-        self.nb_colors = 4
-        self.colors = ["Blue", "Red", "Green", "Yellow"]
-        self.colors_short = list(str(i) for i in range(4))
-        self.color_codes = ['#0075B5', 'red', 'green', 'yellow']
+        self.scores = scores[0:nb_colors]
+        self.colors = ["Blue", "Red", "Green", "Yellow"][0:nb_colors]
+        self.colors_short = list(str(i) for i in range(nb_colors))
+        self.color_codes = ['#0075B5', 'red', 'green', 'yellow'][0:nb_colors]
 
     def neighbors(self, row: int, col: int) -> list[tuple[int, int]]:
         """

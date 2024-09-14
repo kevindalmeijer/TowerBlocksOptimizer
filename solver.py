@@ -78,7 +78,7 @@ class Solver:
         Returns:
             tuple: List of moves (row, col, color).
         """
-        reduced_config, moves = self.__get_reduced_configuration(config)
+        reduced_config, moves = self.get_reduced_configuration(config)
         if not self.valid_sequence(reduced_config, moves, config):
             raise Exception("get_moves() generated an invalid sequence of moves.")  # this should never happen
 
@@ -284,7 +284,7 @@ class Solver:
                     return True
         return False
 
-    def __get_reduced_configuration(
+    def get_reduced_configuration(
         self,
         config: configuration.Configuration
     ) -> tuple[configuration.Configuration, list[tuple[int, int, int]]]:
@@ -322,7 +322,7 @@ class Solver:
             next_to_current_move = [(*promotion, 0)]        # record move to undo the promotion
 
             # create a reduced next configuration and corresponding moves through a recursive call
-            reduced_next_config, reduced_next_to_next_moves = self.__get_reduced_configuration(next_config)
+            reduced_next_config, reduced_next_to_next_moves = self.get_reduced_configuration(next_config)
             reduced_next_moves = reduced_next_to_next_moves + next_to_current_move + current_moves
 
             if reduced_next_config.all_zero():

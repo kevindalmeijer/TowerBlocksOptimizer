@@ -9,8 +9,8 @@ class InfeasibleConfigurationError(Exception):
     """
     Error for configurations that cannot be constructed with valid moves.
     """
-    def __init__(self, config, conflict):
-        super().__init__(f"Configuration\n{config}\nincludes the conflict\n{conflict}.")
+    def __init__(self, config, reduced_config):
+        super().__init__(f"Configuration\n{config}\ncannot be reduced further than\n{reduced_config}.")
 
 
 class SafeReductionError(Exception):
@@ -62,10 +62,10 @@ class Solver:
         self.info["total_score"] = solution.get_total_score()
         return solution, self.info
 
-    def get_moves(self, config: configuration.Configuration) -> tuple[int, int, int]:
+    def get_moves(self, config: configuration.Configuration) -> list[tuple[int, int, int]]:
         """
         Generate a list of moves (row, col, color) that turn the zero configuration
-        into the provided configuration, or throw an error with a conflict.
+        into the provided configuration, or throw an error if the config cannot fully be reduced.
         This method is exhaustive and should find a list of moves if one exists,
         although there are no guarantees on the length of the list.
 
@@ -301,8 +301,9 @@ class Solver:
             config (configuration.Configuration): The configuration to be reduced -- will not be modified.
 
         Returns:
-            configuration.Configuration: The reduced configuration, which is either all zeros if config
-                can be constructed with valid moves, or represent a (not necessarily minimum) conflict.
+            tuple(configuration.Configuration, list): tuple that contains a reduced configuration and a list of moves.
+            The reduced configuration cannot be reduced further and is guaranteed to be all zeros if config can be
+            constructed with valid moves.
         """
         current_config = copy.deepcopy(config)  # config at current node of the search tree
         current_moves = []                      # ...and corresponding moves from current_config to config

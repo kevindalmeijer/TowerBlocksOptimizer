@@ -10,7 +10,7 @@ class InfeasibleConfigurationError(Exception):
     Error for configurations that cannot be constructed with valid moves.
     """
     def __init__(self, config, conflict):
-        super().__init__(f"Configuration\n{config}\nincludes the minimal conflict\n{conflict}.")
+        super().__init__(f"Configuration\n{config}\nincludes the conflict\n{conflict}.")
 
 
 class SafeReductionError(Exception):
@@ -65,7 +65,7 @@ class Solver:
     def get_moves(self, config: configuration.Configuration) -> tuple[int, int, int]:
         """
         Generate a list of moves (row, col, color) that turn the zero configuration
-        into the provided configuration, or throw an error with a minimal conflict.
+        into the provided configuration, or throw an error with a conflict.
         This method is exhaustive and should find a list of moves if one exists,
         although there are no guarantees on the length of the list.
 
@@ -302,7 +302,7 @@ class Solver:
 
         Returns:
             configuration.Configuration: The reduced configuration, which is either all zeros if config
-                can be constructed with valid moves, or represent a minimal (but not necessarily minimum) conflict.
+                can be constructed with valid moves, or represent a (not necessarily minimum) conflict.
         """
         current_config = copy.deepcopy(config)  # config at current node of the search tree
         current_moves = []                      # ...and corresponding moves from current_config to config

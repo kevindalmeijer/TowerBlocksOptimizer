@@ -1,4 +1,4 @@
-import city
+import solver
 import configuration
 from ortools.sat.python import cp_model
 import itertools as it
@@ -10,16 +10,16 @@ class CPOptimizer:
     Optimizer based on constraint-programming solver CP-SAT.
     """
 
-    def __init__(self, city: city.City, settings: dict = {}) -> None:
+    def __init__(self, solver: solver.Solver, settings: dict = {}) -> None:
         """
         Initialize the CPOptimizer object and check the settings provided by the user.
 
         Args:
-            city (city.City): City for which the tower configuration is optimized.
+            solver (solver.Solver): Solver for which the optimizer is called.
             settings (dict): Dictionary of user-provided parameters and values.
                 See __check_user_settings() for details.
         """
-        self.city = city
+        self.city = solver.city
         self.settings = settings
         self.__check_user_settings()
 

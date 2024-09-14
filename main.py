@@ -10,7 +10,7 @@ my_solver = solver.Solver(my_city)
 settings = {
     'print_log': True,
 }
-optimizer = cp_optimizer.CPOptimizer(my_city, settings)
+optimizer = cp_optimizer.CPOptimizer(my_solver, settings)
 
 solution, info = my_solver.solve(optimizer)
 pprint.pprint(info)

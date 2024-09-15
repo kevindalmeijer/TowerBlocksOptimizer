@@ -165,39 +165,49 @@ class LazyOptimizer:
             def __init__(self, optimizer: LazyOptimizer) -> None:
                 """
                 Initialize the callback with a reference to the containing class.
+
+                Args:
+                    optimizer (LazyOptimizer): reference to the containing class.
                 """
                 self.optimizer = optimizer
 
-            def __call__(self, model: gp.Model, where: int):
+            def __call__(self, model: gp.Model, where: int) -> None:
                 """
-                Callback entry point.
+                Callback entry point: find a conflict if one exists, and add
+                a lazy constraint to prevent it.
 
                 Args:
                     model (gp.Model): the calling model.
                     where (int): indicator where the callback is called from.
                 """
-                if where == GRB.Callback.MIPSOL:
+                if where == GRB.Callback.MIPSOL:  # integer solution found
 
                     optimizer = self.optimizer
                     solver = optimizer.solver
                     city = optimizer.city
 
-                    # extract current solution
-                    solution = optimizer.get_solution_towers(in_callback=True)
-                    config = configuration.Configuration(self.optimizer.city)
-                    config.towers = solution
+                    # Extract current solution
+                    config = configuration.Configuration(city)
+                    config.towers = optimizer.get_solution_towers(in_callback=True)
 
-                    # find a conflict and add a cut to forbid it
-                    conflict, _moves = solver.get_reduced_configuration(config)
-                    if not conflict.all_zero():
-                        lhs = gp.quicksum(
-                            optimizer.y[i, j, conflict.towers[i][j]]
-                            for i in range(city.n)
-                            for j in range(city.m)
-                            if conflict.towers[i][j] != 0
-                        )
-                        rhs = lhs.size() - 1
-                        model.cbLazy(lhs <= rhs)
+                    # Find conflict opportunistically (fast but not guaranteed)
+                    conflict = solver.get_opportunistic_minimal_conflict(config)
+
+                    # If no conflict is found, try again rigorously (slow but guaranteed)
+                    if conflict.all_zero():
+                        conflict, _moves = solver.get_reduced_configuration(config)
+                        if conflict.all_zero():
+                            return  # no conflict found
+
+                    # Add a cut to forbid the conflict
+                    lhs = gp.quicksum(
+                        optimizer.y[i, j, conflict.towers[i][j]]
+                        for i in range(city.n)
+                        for j in range(city.m)
+                        if conflict.towers[i][j] != 0
+                    )
+                    rhs = conflict.nb_nonzero() - 1
+                    model.cbLazy(lhs <= rhs)
 
         return Callback(self)
 

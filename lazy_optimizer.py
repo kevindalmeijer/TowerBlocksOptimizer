@@ -261,3 +261,12 @@ class LazyOptimizer:
                             for delta_j in [0, 1]
                         ) <= 3
                     )
+
+        # At least one 0-tower
+        model.addConstr(
+            gp.quicksum(
+                y[i, j, 0]
+                for i in range(n)
+                for j in range(m)
+            ) >= 1
+        )

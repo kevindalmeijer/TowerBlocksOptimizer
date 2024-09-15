@@ -131,6 +131,15 @@ class Configuration:
         """
         return all(tower == 0 for tower_row in self.towers for tower in tower_row)
 
+    def nb_nonzero(self) -> int:
+        """
+        Return the number of towers that have non-zero color.
+
+        Returns:
+            int: Number of towers with non-zero color.
+        """
+        return sum(tower != 0 for tower_row in self.towers for tower in tower_row)
+
     def __check_bounds(self, row: int, col: int, color: int) -> None:
         """
         Check if the given placement is within the bounds of the grid and if the color is valid.

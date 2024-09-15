@@ -1,2 +1,3 @@
 ortools==9.10.4067
 matplotlib==3.9.2
+gurobipy

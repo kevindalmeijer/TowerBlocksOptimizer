@@ -1,16 +1,30 @@
 import city
 import solver
 import cp_optimizer
+import lazy_optimizer
 import visualizer
 import pprint
 
-my_city = city.City(5, 5, scores=[205, 966, 2677, 5738])
-my_solver = solver.Solver(my_city)
+height = 5
+width = 5
+scores = [205, 966, 2677, 5738]
 
+method = 0
 settings = {
     'print_log': True,
+    # 'time_limit': 60,
+    # 'depth_limit': 5,
 }
-optimizer = cp_optimizer.CPOptimizer(my_solver, settings)
+
+my_city = city.City(height, width, scores=scores)
+my_solver = solver.Solver(my_city)
+
+if method == 0:
+    optimizer = cp_optimizer.CPOptimizer(my_solver, settings)
+elif method == 1:
+    optimizer = lazy_optimizer.LazyOptimizer(my_solver, settings)  # requires Gurobi license
+else:
+    raise ValueError(f"Method {method} not recognized.")
 
 solution, info = my_solver.solve(optimizer)
 pprint.pprint(info)

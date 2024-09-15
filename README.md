@@ -42,7 +42,14 @@ and then pip install the packages listed in `python_requirements.txt`:
 ```
 python -m pip install -r python_requirements.txt
 ```
-The script `main.py` provides an example for how to use the optimizer. 
+The script `main.py` provides an example for how to use the optimizer.
+
+> [!NOTE]
+> Using `LazyOptimizer` requires Gurobi to be installed separately with an active license.
+> Note that this only affects `LazyOptimizer`, and the other optimizers (e.g. `CPOptimizer`) can be used without Gurobi.
+> If Gurobi is already installed, the instructions above should automatically link to Gurobi through the `gurobipy` package.
+> If this doesn't work, please see the [Gurobi Help Center](https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python) for detailed instructions.
+> While Gurobi licenses are typically not free, academics and recent graduates can get a license at no cost through the [Academic License Program](https://www.gurobi.com/academia/academic-program-and-licenses/).
 
 ## Best known configurations
 The following best known configurations were found with `TowerBlocksOptimizer`.

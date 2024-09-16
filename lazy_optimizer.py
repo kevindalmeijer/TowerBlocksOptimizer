@@ -201,7 +201,7 @@ class LazyOptimizer:
                             return  # no conflict found
 
                     # Strengthen conflict by replacing 3-towers by 2-towers where possible
-                    optimizer._strengthen_conflict(conflict)
+                    optimizer.strengthen_conflict(conflict)
 
                     # Add a cut to forbid the conflict
                     lhs = gp.quicksum(
@@ -328,7 +328,7 @@ class LazyOptimizer:
         else:
             return False
 
-    def _strengthen_conflict(self, conflict: configuration.Configuration) -> None:
+    def strengthen_conflict(self, conflict: configuration.Configuration) -> None:
         """
         Strenghtens a conflict by replacing 3-towers with 2-towers in a way that maintains the conflict.
         A conflict is a configuration in which the non-0 tower positions cannot be reached with valid moves.

@@ -330,17 +330,34 @@ class LazyOptimizer:
 
     def strengthen_conflict(self, conflict: configuration.Configuration) -> None:
         """
-        Strenghtens a conflict by replacing 3-towers with 2-towers in a way that maintains the conflict.
-        A conflict is a configuration in which the non-0 tower positions cannot be reached with valid moves.
+        Strenghtens a conflict by replacing 3-towers with 2-towers in a way that maintains an opportunistic
+        conflict (see get_opportunistic_minimal_conflict()). A conflict is a configuration in which the
+        non-0 tower positions cannot be reached with valid moves. If the conflict cannot be strengthened
+        (or fails to be an opportunistic conflict), the input is not modified.
 
         Note:
             Cutting off a strengthened conflict requires special attention, see the comments in Callback.__call__().
 
         Args:
             conflict (configuration.Configuration): The conflict to start from -- will be modified!
-                The all-zero configuration is a valid input and will simply be ignored.
+                The all-zero configuration is a valid input and will not be modified.
         """
-        pass
+        for row in range(self.city.n):
+            for col in range(self.city.m):
+
+                if conflict.towers[row][col] != 3:
+                    continue
+
+                # Check if the conflict remains after changing (row, col) to 2
+                next_conflict = copy.deepcopy(conflict)
+                next_conflict.place_tower(row, col, 2)
+                self.__apply_opportunistic_reductions(next_conflict)
+
+                if not next_conflict.all_zero():
+                    # An opportunistic conflict remains: make the same change to conflict
+                    conflict.place_tower(row, col, 2)
+
+        return
 
     def __add_valid_inequalities(
         self,

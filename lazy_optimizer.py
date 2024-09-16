@@ -201,10 +201,13 @@ class LazyOptimizer:
 
                     # Add a cut to forbid the conflict
                     lhs = gp.quicksum(
-                        optimizer.y[i, j, conflict.towers[i][j]]
+                        optimizer.y[i, j, color]
                         for i in range(city.n)
                         for j in range(city.m)
                         if conflict.towers[i][j] != 0
+                        for color in {conflict.towers[i][j], 3}  # Add color 3 to the lhs...
+                        # ...this is allowed because changing a tower to 3 never resolves the conflict.
+                        # It is mandatory when strengthen_conflict() is used to ensure the current solution is cut off.
                     )
                     rhs = conflict.nb_nonzero() - 1
                     model.cbLazy(lhs <= rhs)

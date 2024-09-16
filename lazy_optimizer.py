@@ -199,6 +199,9 @@ class LazyOptimizer:
                         if conflict.all_zero():
                             return  # no conflict found
 
+                    # Strengthen conflict by replacing 3-towers by 2-towers where possible
+                    optimizer._strengthen_conflict(conflict)
+
                     # Add a cut to forbid the conflict
                     lhs = gp.quicksum(
                         optimizer.y[i, j, color]
@@ -213,6 +216,20 @@ class LazyOptimizer:
                     model.cbLazy(lhs <= rhs)
 
         return Callback(self)
+
+    def _strengthen_conflict(self, conflict: configuration.Configuration) -> None:
+        """
+        Strenghtens a conflict by replacing 3-towers with 2-towers in a way that maintains the conflict.
+        A conflict is a configuration in which the non-0 tower positions cannot be reached with valid moves.
+
+        Note:
+            Cutting off a strengthened conflict requires special attention, see the comments in Callback.__call__().
+
+        Args:
+            conflict (configuration.Configuration): The conflict to start from -- will be modified!
+                The all-zero configuration is a valid input and will simply be ignored.
+        """
+        pass
 
     def __add_valid_inequalities(
         self,

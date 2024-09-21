@@ -277,21 +277,47 @@ class LazyOptimizer:
 
         return last_conflict
 
-    def __apply_opportunistic_reductions(self, config: configuration.Configuration) -> None:
+    def __apply_opportunistic_reductions(
+        self,
+        config: configuration.Configuration,
+        search_roots: list[tuple[int]] = None
+    ) -> None:
         """
         Apply as many opportunistic reductions to the given configuration as possible (modifying the input).
+        Uses depth-first search to recursively try to reduce neighbors of 0-towers to zero.
+        This is motivated by the fact that any tower requires at least one 0-neighbor for reduction.
+        If a tower cannot currently be reduced, it will be reconsidered after one of its other neighbors is reduced.
+
+        If optional search roots are provided, then the search is only performed starting from these locations.
+        Depending on the roots, this may be restrictive, and not all possible reductions may be found.
 
         Args:
             config (configuration.Configuration): The configuration to start from -- will be modified!
+            search_roots (list): List of (row, col) location tuples to be used as roots for the depth-first search.
+                Each search root is required to be a 0-tower, i.e., config.towers[row][col] == 0.
         """
-        change_made = True
-        while change_made:
-            change_made = False
-            for row in range(self.city.n):
-                for col in range(self.city.m):
-                    modified = self.__apply_opportunistic_reduction(config, row, col)
-                    if modified:
-                        change_made = True
+        def reduce_neighbors_and_recurse(config, row, col):
+            for p, q in self.city.neighbors(row, col):
+                reduced = self.__apply_opportunistic_reduction(config, p, q)
+                if reduced:
+                    reduce_neighbors_and_recurse(config, p, q)
+
+        if search_roots is not None:
+            for (row, col) in search_roots:
+                color = config.towers[row][col]
+                if color != 0:
+                    raise ValueError(f"Search roots are required to have color 0: {(row, col)} has color {color}.")
+        else:
+            search_roots = [
+                (row, col)
+                for row in range(self.city.n)
+                for col in range(self.city.m)
+                if config.towers[row][col] == 0
+            ]
+
+        for (row, col) in search_roots:
+            reduce_neighbors_and_recurse(config, row, col)
+
         return
 
     def __apply_opportunistic_reduction(self, config: configuration.Configuration, row: int, col: int) -> bool:

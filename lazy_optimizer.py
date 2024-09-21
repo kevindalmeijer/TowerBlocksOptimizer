@@ -266,7 +266,7 @@ class LazyOptimizer:
 
                     # See if the conflict remains after changing (row, col) to 0
                     current_config.place_tower(row, col, 0)
-                    self.__apply_opportunistic_reductions(current_config)
+                    self.__apply_opportunistic_reductions(current_config, search_roots=[(row, col)])
 
                     if current_config.all_zero():
                         # No opportunistic conflict: reset to last_conflict

@@ -320,7 +320,12 @@ class LazyOptimizer:
 
         return
 
-    def __apply_opportunistic_reduction(self, config: configuration.Configuration, row: int, col: int) -> bool:
+    def __apply_opportunistic_reduction(
+        self,
+        config: configuration.Configuration,
+        row: int,
+        col: int,
+    ) -> bool:
         """
         Opportunistically reduce the color of the tower at position (row, col) to zero.
         If the reduction is successful, config is updated to the reduced configuration, and the value True is returned.
@@ -337,6 +342,33 @@ class LazyOptimizer:
         Returns:
             bool: True if config was modified to reduce tower (row, col) to zero, False otherwise.
         """
+        has_reduction = self.__has_opportunistic_reduction(config, row, col)
+        if has_reduction:
+            config.place_tower(row, col, 0)
+            return True
+        else:
+            return False
+
+    def __has_opportunistic_reduction(
+        self,
+        config: configuration.Configuration,
+        row: int,
+        col: int
+    ) -> bool:
+        """
+        Opportunistically test if the color of the tower at position (row, col) can be reduced to zero.
+        An opportunistic reduction looks at whether the number of 0-towers is sufficient for the necessary promotions,
+        but it is not verified whether these promotions are safe (compare to Solver.__apply_safe_reduction()).
+
+        Args:
+            config (configuration.Configuration): The configuration to start from -- will not be modified.
+            row (int): The row index of the tower to be reduced.
+            col (int): The column index of the tower to be reduced.
+
+        Returns:
+            bool: True if tower (row, col) has an opportunistic reduction to zero, False otherwise.
+                Also returns False if the tower is already reduced.
+        """
         color = config.towers[row][col]
         if color == 0:
             return False  # tower is already color 0
@@ -349,7 +381,6 @@ class LazyOptimizer:
         nb_promotions_available = neighbor_counts[0] - 1  # -1 to maintain at least one neighbor with color 0
 
         if nb_promotions_needed <= nb_promotions_available:
-            config.place_tower(row, col, 0)
             return True
         else:
             return False

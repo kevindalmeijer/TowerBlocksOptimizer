@@ -105,22 +105,22 @@ class Configuration:
                 return True
         return False
 
-    def neighbor_counts(self, row: int, col: int) -> list[int]:
+    def neighbor_counts(self, row: int, col: int) -> tuple[int]:
         """
-        Return a list of the number of neigboring towers for each color.
+        Return a tuple of the number of neigboring towers for each color.
 
         Args:
             row (int): The row index of the tower.
             col (int): The column index of the tower.
 
         Returns:
-            list: list of the number of neigboring towers for each color, i.e.,
+            tuple: tuple of the number of neigboring towers for each color, i.e.,
                 element color is the number of neighbors with that color.
         """
-        return [
+        return tuple(
             sum(self.towers[p][q] == color for p, q in self.city.neighbors(row, col))
             for color in range(self.city.nb_colors)
-        ]
+        )
 
     def all_zero(self) -> bool:
         """

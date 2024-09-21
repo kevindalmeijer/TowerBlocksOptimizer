@@ -42,12 +42,13 @@ class City:
             list: A list of (row, col) tuples representing valid neighboring cells.
             For the 1x1 grid the list is empty.
         """
-        neighbors = [
-            (row - 1, col),  # Up
-            (row + 1, col),  # Down
-            (row, col - 1),  # Left
-            (row, col + 1)   # Right
-        ]
-
-        # Filter neighbors to keep only those within bounds
-        return [(r, c) for r, c in neighbors if 0 <= r < self.n and 0 <= c < self.m]
+        neighbors = []
+        if row > 0:
+            neighbors.append((row - 1, col))  # Up
+        if row < self.n - 1:
+            neighbors.append((row + 1, col))  # Down
+        if col > 0:
+            neighbors.append((row, col - 1))  # Left
+        if col < self.m - 1:
+            neighbors.append((row, col + 1))  # Right
+        return neighbors

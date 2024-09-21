@@ -99,8 +99,7 @@ class Configuration:
         Raises:
             ValueError: If the row or column index is out of bounds, or if the color is invalid.
         """
-        neighbors = self.city.neighbors(row, col)
-        for p, q in neighbors:
+        for p, q in self.city.neighbors(row, col):
             if self.towers[p][q] == color:
                 return True
         return False

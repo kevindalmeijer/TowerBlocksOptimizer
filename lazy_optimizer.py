@@ -309,7 +309,7 @@ class LazyOptimizer:
             col (int): The column index of the tower to be reduced.
 
         Returns:
-            bool: True if config was modified, False otherwise.
+            bool: True if config was modified to reduce tower (row, col) to zero, False otherwise.
         """
         color = config.towers[row][col]
         if color == 0:

@@ -405,14 +405,19 @@ class LazyOptimizer:
                 if conflict.towers[row][col] != 3:
                     continue
 
-                # Check if the conflict remains after changing (row, col) to 2
-                next_conflict = copy.deepcopy(conflict)
-                next_conflict.place_tower(row, col, 2)
-                self.__apply_opportunistic_reductions(next_conflict)
+                # Change (row, col) from 3 to 2 and see if the conflict remains
+                conflict.place_tower(row, col, 2)
 
-                if not next_conflict.all_zero():
-                    # An opportunistic conflict remains: make the same change to conflict
-                    conflict.place_tower(row, col, 2)
+                # Test 1: check if (row, col) has become reducible
+                if self.__has_opportunistic_reduction(conflict, row, col):
+                    conflict.place_tower(row, col, 3)  # undo 3 -> 2 replacement and continue
+                    continue
+
+                # Test 2: check if 3-neighbors have become reducible
+                for p, q in self.city.neighbors(row, col):
+                    if conflict.towers[p][q] == 3 and self.__has_opportunistic_reduction(conflict, p, q):
+                        conflict.place_tower(row, col, 3)  # undo 3 -> 2 replacement and continue
+                        break
 
         return
 

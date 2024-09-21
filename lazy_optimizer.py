@@ -373,17 +373,26 @@ class LazyOptimizer:
         if color == 0:
             return False  # tower is already color 0
 
-        neighbor_counts = config.neighbor_counts(row, col)
-        nb_promotions_needed = sum(
-            neighbor_count == 0  # neighbor is missing, so a promotion is needed
-            for neighbor_count in neighbor_counts[1:color]
-        )
-        nb_promotions_available = neighbor_counts[0] - 1  # -1 to maintain at least one neighbor with color 0
+        nb_useful_neighbors = 0
+        seen_one = False
+        seen_two = False
 
-        if nb_promotions_needed <= nb_promotions_available:
-            return True
-        else:
-            return False
+        for p, q in self.city.neighbors(row, col):
+            neighbor_color = config.towers[p][q]
+            if neighbor_color >= color:
+                continue  # higher colors are not useful
+            if neighbor_color == 0:
+                nb_useful_neighbors += 1  # 0-towers are always useful
+            if neighbor_color == 1 and not seen_one:
+                nb_useful_neighbors += 1  # 1-towers are only useful once
+                seen_one = True
+            if neighbor_color == 2 and not seen_two:
+                nb_useful_neighbors += 1  # 2-towers are only useful once
+                seen_two = True
+            if nb_useful_neighbors >= color:
+                return True  # requirements have been met
+
+        return False
 
     def strengthen_conflict(self, conflict: configuration.Configuration) -> None:
         """

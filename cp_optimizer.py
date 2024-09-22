@@ -350,3 +350,13 @@ class CPOptimizer:
                                 for delta_j in [0, 1]
                             ) <= 3
                         )
+
+        # At least one 0-tower
+        for t in range(nb_periods):
+            model.Add(
+                sum(
+                    x[i, j, 0, t]
+                    for i in range(n)
+                    for j in range(m)
+                ) >= 1
+            )

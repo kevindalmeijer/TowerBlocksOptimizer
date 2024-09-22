@@ -60,6 +60,23 @@ class LazyOptimizer:
 
         return solution, info
 
+    def set_start_configuration(self, config: configuration.Configuration) -> None:
+        """
+        Provide a configuration to be used as a MIP start. This can be used to provide
+        Gurobi an initial solution that provides a strong lower bound.
+
+        Args:
+            config (configuration.Configuration): The configuration to use as a MIP start.
+        """
+        for row in range(self.city.n):
+            for col in range(self.city.m):
+                for color in range(self.city.nb_colors):
+                    if config.towers[row][col] == color:
+                        self.y[row, col, color].Start = 1
+                    else:
+                        self.y[row, col, color].Start = 0
+        return
+
     def get_solution_towers(self, in_callback: bool = False) -> list[list[int]]:
         """
         Get the tower placements found by the solver as a double array.

@@ -212,6 +212,7 @@ class LazyOptimizer:
                         for color in {conflict.towers[i][j], 3}  # Add color 3 to the lhs...
                         # ...this is allowed because changing a tower to 3 never resolves the conflict.
                         # It is mandatory when strengthen_conflict() is used to ensure the current solution is cut off.
+                        if color < city.nb_colors
                     )
                     rhs = conflict.nb_nonzero() - 1
                     model.cbLazy(lhs <= rhs)

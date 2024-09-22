@@ -99,8 +99,7 @@ class Configuration:
         Raises:
             ValueError: If the row or column index is out of bounds, or if the color is invalid.
         """
-        neighbors = self.city.neighbors(row, col)
-        for p, q in neighbors:
+        for p, q in self.city.neighbors(row, col):
             if self.towers[p][q] == color:
                 return True
         return False
@@ -117,10 +116,11 @@ class Configuration:
             list: list of the number of neigboring towers for each color, i.e.,
                 element color is the number of neighbors with that color.
         """
-        return [
-            sum(self.towers[p][q] == color for p, q in self.city.neighbors(row, col))
-            for color in range(self.city.nb_colors)
-        ]
+        result = [0 for _ in range(self.city.nb_colors)]
+        for p, q in self.city.neighbors(row, col):
+            color = self.towers[p][q]
+            result[color] += 1
+        return result
 
     def all_zero(self) -> bool:
         """

@@ -267,7 +267,7 @@ class LazyOptimizer:
 
                     # See if the conflict remains after changing (row, col) to 0
                     current_config.place_tower(row, col, 0)
-                    self.__apply_opportunistic_reductions(current_config)
+                    self.__apply_opportunistic_reductions(current_config, search_roots=[(row, col)])
 
                     if current_config.all_zero():
                         # No opportunistic conflict: reset to last_conflict
@@ -278,24 +278,55 @@ class LazyOptimizer:
 
         return last_conflict
 
-    def __apply_opportunistic_reductions(self, config: configuration.Configuration) -> None:
+    def __apply_opportunistic_reductions(
+        self,
+        config: configuration.Configuration,
+        search_roots: list[tuple[int]] = None
+    ) -> None:
         """
         Apply as many opportunistic reductions to the given configuration as possible (modifying the input).
+        Uses depth-first search to recursively try to reduce neighbors of 0-towers to zero.
+        This is motivated by the fact that any tower requires at least one 0-neighbor for reduction.
+        If a tower cannot currently be reduced, it will be reconsidered after one of its other neighbors is reduced.
+
+        If optional search roots are provided, then the search is only performed starting from these locations.
+        Depending on the roots, this may be restrictive, and not all possible reductions may be found.
 
         Args:
             config (configuration.Configuration): The configuration to start from -- will be modified!
+            search_roots (list): List of (row, col) location tuples to be used as roots for the depth-first search.
+                Each search root is required to be a 0-tower, i.e., config.towers[row][col] == 0.
         """
-        change_made = True
-        while change_made:
-            change_made = False
-            for row in range(self.city.n):
-                for col in range(self.city.m):
-                    modified = self.__apply_opportunistic_reduction(config, row, col)
-                    if modified:
-                        change_made = True
+        def reduce_neighbors_and_recurse(config, row, col):
+            for p, q in self.city.neighbors(row, col):
+                reduced = self.__apply_opportunistic_reduction(config, p, q)
+                if reduced:
+                    reduce_neighbors_and_recurse(config, p, q)
+
+        if search_roots is not None:
+            for (row, col) in search_roots:
+                color = config.towers[row][col]
+                if color != 0:
+                    raise ValueError(f"Search roots are required to have color 0: {(row, col)} has color {color}.")
+        else:
+            search_roots = [
+                (row, col)
+                for row in range(self.city.n)
+                for col in range(self.city.m)
+                if config.towers[row][col] == 0
+            ]
+
+        for (row, col) in search_roots:
+            reduce_neighbors_and_recurse(config, row, col)
+
         return
 
-    def __apply_opportunistic_reduction(self, config: configuration.Configuration, row: int, col: int) -> bool:
+    def __apply_opportunistic_reduction(
+        self,
+        config: configuration.Configuration,
+        row: int,
+        col: int,
+    ) -> bool:
         """
         Opportunistically reduce the color of the tower at position (row, col) to zero.
         If the reduction is successful, config is updated to the reduced configuration, and the value True is returned.
@@ -310,24 +341,59 @@ class LazyOptimizer:
             col (int): The column index of the tower to be reduced.
 
         Returns:
-            bool: True if config was modified, False otherwise.
+            bool: True if config was modified to reduce tower (row, col) to zero, False otherwise.
+        """
+        has_reduction = self.__has_opportunistic_reduction(config, row, col)
+        if has_reduction:
+            config.place_tower(row, col, 0)
+            return True
+        else:
+            return False
+
+    def __has_opportunistic_reduction(
+        self,
+        config: configuration.Configuration,
+        row: int,
+        col: int
+    ) -> bool:
+        """
+        Opportunistically test if the color of the tower at position (row, col) can be reduced to zero.
+        An opportunistic reduction looks at whether the number of 0-towers is sufficient for the necessary promotions,
+        but it is not verified whether these promotions are safe (compare to Solver.__apply_safe_reduction()).
+
+        Args:
+            config (configuration.Configuration): The configuration to start from -- will not be modified.
+            row (int): The row index of the tower to be reduced.
+            col (int): The column index of the tower to be reduced.
+
+        Returns:
+            bool: True if tower (row, col) has an opportunistic reduction to zero, False otherwise.
+                Also returns False if the tower is already reduced.
         """
         color = config.towers[row][col]
         if color == 0:
             return False  # tower is already color 0
 
-        neighbor_counts = config.neighbor_counts(row, col)
-        nb_promotions_needed = sum(
-            neighbor_count == 0  # neighbor is missing, so a promotion is needed
-            for neighbor_count in neighbor_counts[1:color]
-        )
-        nb_promotions_available = neighbor_counts[0] - 1  # -1 to maintain at least one neighbor with color 0
+        nb_useful_neighbors = 0
+        seen_one = False
+        seen_two = False
 
-        if nb_promotions_needed <= nb_promotions_available:
-            config.place_tower(row, col, 0)
-            return True
-        else:
-            return False
+        for p, q in self.city.neighbors(row, col):
+            neighbor_color = config.towers[p][q]
+            if neighbor_color >= color:
+                continue  # higher colors are not useful
+            if neighbor_color == 0:
+                nb_useful_neighbors += 1  # 0-towers are always useful
+            if neighbor_color == 1 and not seen_one:
+                nb_useful_neighbors += 1  # 1-towers are only useful once
+                seen_one = True
+            if neighbor_color == 2 and not seen_two:
+                nb_useful_neighbors += 1  # 2-towers are only useful once
+                seen_two = True
+            if nb_useful_neighbors >= color:
+                return True  # requirements have been met
+
+        return False
 
     def strengthen_conflict(self, conflict: configuration.Configuration) -> None:
         """
@@ -349,14 +415,19 @@ class LazyOptimizer:
                 if conflict.towers[row][col] != 3:
                     continue
 
-                # Check if the conflict remains after changing (row, col) to 2
-                next_conflict = copy.deepcopy(conflict)
-                next_conflict.place_tower(row, col, 2)
-                self.__apply_opportunistic_reductions(next_conflict)
+                # Change (row, col) from 3 to 2 and see if the conflict remains
+                conflict.place_tower(row, col, 2)
 
-                if not next_conflict.all_zero():
-                    # An opportunistic conflict remains: make the same change to conflict
-                    conflict.place_tower(row, col, 2)
+                # Test 1: check if (row, col) has become reducible
+                if self.__has_opportunistic_reduction(conflict, row, col):
+                    conflict.place_tower(row, col, 3)  # undo 3 -> 2 replacement and continue
+                    continue
+
+                # Test 2: check if 3-neighbors have become reducible
+                for p, q in self.city.neighbors(row, col):
+                    if conflict.towers[p][q] == 3 and self.__has_opportunistic_reduction(conflict, p, q):
+                        conflict.place_tower(row, col, 3)  # undo 3 -> 2 replacement and continue
+                        break
 
         return
 

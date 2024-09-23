@@ -126,9 +126,8 @@ class LazyOptimizer:
 
         if "time_limit" in self.settings:
             self.model.setParam(GRB.Param.TimeLimit, self.settings['time_limit'])
-        if "print_log" in self.settings:
-            if not self.settings["print_log"]:
-                self.model.setParam(GRB.Param.OutputFlag, 0)
+        if not self.settings.get("print_log", False):
+            self.model.setParam(GRB.Param.OutputFlag, 0)
 
     def __define_variables(
         self,

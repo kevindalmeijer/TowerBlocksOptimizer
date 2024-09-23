@@ -38,9 +38,9 @@ First upgrade pip:
 ```
 python -m pip install pip --upgrade
 ```
-and then pip install the packages listed in `python_requirements.txt`:
+and then pip install the packages listed in `requirements.txt`:
 ```
-python -m pip install -r python_requirements.txt
+python -m pip install -r requirements.txt
 ```
 The script `main.py` provides an example for how to use the optimizer.
 

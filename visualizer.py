@@ -55,6 +55,15 @@ class Visualizer:
             color_code = self.city.color_codes[color]
             self.rectangles[i, j].set_fc(color_code)
 
+    def save_plot(self, filename: str) -> None:
+        """
+        Save the current plot as an image.
+
+        Args:
+            filename (str): The filename to save the image (with '.png' extension).
+        """
+        plt.savefig(filename)
+
     def set_animation(self, moves: list[tuple[int, int, int]], start_empty=False) -> None:
         """
         Update the plot to reflect the provided set of moves.

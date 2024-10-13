@@ -50,7 +50,7 @@ class CPOptimizer:
             tuple(configuration.Configuration, dict): Best configuration that was found and
             a dictionary with information about the solve.
         """
-        status = self.solver.Solve(self.model)
+        status = self.cp_solver.Solve(self.model)
 
         solution = configuration.Configuration(self.city)
         solution.towers = self.get_solution_towers()
@@ -75,7 +75,7 @@ class CPOptimizer:
         solution = [
             [
                 sum(
-                    self.solver.Value(self.y[i, j, k]) * k
+                    self.cp_solver.Value(self.y[i, j, k]) * k
                     for k in range(self.city.nb_colors)
                 )
                 for j in range(self.city.m)
@@ -94,7 +94,7 @@ class CPOptimizer:
         nb_periods = self.nb_periods
 
         self.model = cp_model.CpModel()
-        self.solver = cp_model.CpSolver()
+        self.cp_solver = cp_model.CpSolver()
 
         self.__set_solver_settings()
         self.x, self.y = self.__define_variables(self.model, n, m, nb_colors, nb_periods)
@@ -107,9 +107,9 @@ class CPOptimizer:
         Set solver settings based on the settings provided at initialization.
         """
         if "time_limit" in self.settings:
-            self.solver.parameters.max_time_in_seconds = self.settings['time_limit']
+            self.cp_solver.parameters.max_time_in_seconds = self.settings['time_limit']
         if "print_log" in self.settings:
-            self.solver.parameters.log_search_progress = self.settings["print_log"]
+            self.cp_solver.parameters.log_search_progress = self.settings["print_log"]
 
     def __define_variables(
         self,

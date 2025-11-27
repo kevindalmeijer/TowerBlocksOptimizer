@@ -41,7 +41,15 @@ class City:
         Returns:
             list: A list of (row, col) tuples representing valid neighboring cells.
             For the 1x1 grid the list is empty.
+
+        Raises:
+            ValueError: If row or col is out of bounds.
         """
+        if row < 0 or row >= self.n:
+            raise ValueError(f"Row index {row} is out of bounds. Must be between 0 and {self.n - 1}.")
+        if col < 0 or col >= self.m:
+            raise ValueError(f"Col index {col} is out of bounds. Must be between 0 and {self.m - 1}.")
+
         neighbors = []
         if row > 0:
             neighbors.append((row - 1, col))  # Up

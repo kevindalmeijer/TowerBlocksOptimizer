@@ -60,3 +60,32 @@ class City:
         if col < self.m - 1:
             neighbors.append((row, col + 1))  # Right
         return neighbors
+
+    def extended_neighbors(self, row: int, col: int) -> list[tuple[int, int]]:
+        """
+        Create a list of extended neighbors to a given cell, filtering out-of-bounds neighbors.
+        Extended neighbors are those that can be reached by a chess king in a single step.
+
+        Args:
+            row (int): The row index of the cell.
+            col (int): The column index of the cell.
+
+        Returns:
+            list: A list of (row, col) tuples representing valid neighboring cells.
+            For the 1x1 grid the list is empty.
+
+        Raises:
+            ValueError: If row or col is out of bounds.
+        """
+        if row < 0 or row >= self.n:
+            raise ValueError(f"Row index {row} is out of bounds. Must be between 0 and {self.n - 1}.")
+        if col < 0 or col >= self.m:
+            raise ValueError(f"Col index {col} is out of bounds. Must be between 0 and {self.m - 1}.")
+
+        neighbors = [
+            (i, j)
+            for i in range(row - 1, row + 2)
+            for j in range(col - 1, col + 2)
+            if i >= 0 and i < self.n and j >= 0 and j < self.m and (i, j) != (row, col)
+        ]
+        return neighbors

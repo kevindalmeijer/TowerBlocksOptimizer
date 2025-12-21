@@ -288,7 +288,6 @@ class YellowCPOptimizer:
             n (int): shorthand for self.city.n
             m (int): shorthand for self.city.m
         """
-        pass
 
         # Distance at (0, 0) is zero
         model.Add(d[0, 0] == 0)

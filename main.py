@@ -16,7 +16,7 @@ method = 0
 settings = {
     'print_log': True,
     # 'time_limit': 60,
-    # 'depth_limit': 5,                 # method 1 only
+    # 'depth_limit': 5,                 # method 0 only
     # "prioritize_feasibility": False,  # method 2 only
     # "suboptimality_cuts": True,       # method 2 only
 }
